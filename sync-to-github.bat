@@ -8,7 +8,7 @@ REM
 REM  Optional: run it from Command Prompt with a message describing the change:
 REM      sync-to-github.bat "Added a new crop to the crop guide"
 REM
-REM  Never uploaded: your .env (API key), photos, videos, and zip files.
+REM  Never uploaded: your API key (ai-settings.json, .env), photos, videos, and zip files.
 REM =====================================================================
 
 setlocal
@@ -35,6 +35,7 @@ REM ---------- 2. Protect secrets and personal files ----------
 if not exist ".gitignore" type nul > ".gitignore"
 call :ignore ".env"
 call :ignore ".env.*"
+call :ignore "ai-settings.json"
 call :ignore "!.env.example"
 call :ignore "node_modules/"
 call :ignore ".DS_Store"

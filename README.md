@@ -9,31 +9,36 @@ An AI-powered gardening assistant MVP for beginner and community gardeners, buil
 - a chat assistant that discusses the photo
 - a progress tracker with before-and-after photos
 
-Built with plain **HTML, CSS, and JavaScript** (no frameworks). There's an optional tiny **Node.js server** for real AI.
+Built with plain **HTML, CSS, and JavaScript** (no frameworks, nothing to install). Live AI talks to OpenAI straight from the browser.
 
 ---
 
-## 1. Run the app (demo mode): no setup needed
+## 1. Start the app
 
-1. Open the `GardenGrow AI App` folder.
-2. Double-click **`index.html`**. It opens in your web browser.
-3. The first screen is **Choose your class & project**. Click **Create the first class** (for example, "Environmental Science, Period 2").
-4. In the class, click **New project**. Enter a team name, members (optional), and what they want to grow (optional; it can be decided later).
-5. The project opens. Click **Scan My Garden**, upload a photo (or try the sample photo), and click **Analyze My Garden**.
+**Nothing to install.** Open the app folder and double-click **`index.html`**. It opens in your web browser (Chrome or Edge work best).
+
+1. The first screen is **Choose your class & project**. Click **Create the first class** (for example, "Environmental Science, Period 2").
+2. In the class, click **New project**. Enter a team name, members (optional), and what they want to grow (optional; it can be decided later).
+3. The project opens. Click **Scan My Garden**, upload a photo (or try the sample photo), and click **Analyze My Garden**.
+
+Until an OpenAI key is added (section 3), the app runs in **Demo mode** with sample results.
+
+**Tip for a classroom computer:** right-click `index.html` → **Send to → Desktop (create shortcut)** so students can find it easily.
 
 ## 2. Using it in the classroom
 
 - **Students:** go to **All Projects**, find your class, and tap your team's project card. Everything (photos, action plan, chat, progress) belongs to that project only. Use the search box to find a class, project, or team member.
 - **Switching:** the chip at the top of the sidebar shows which project is open. Click **Switch** to go back to the list.
 - **Any crop:** each project lists what it wants to grow under *My Garden → Intended plants or crops* (for example, "tomatoes, basil"). Built-in guides cover pumpkins and winter squash, zucchini, cucumbers and melons, tomatoes, peppers, beans and peas, leafy greens, root crops, potatoes, corn, herbs, and sunflowers. The guides adjust sunlight needs, pH range, timing, spacing, watering, and pests. Anything else gets general vegetable advice.
-- **Teacher tools** (button on the project list, or at the bottom of the sidebar):
-  - **Teacher PIN (optional).** Once set, it's required to create, edit, or delete classes, delete projects, download backups, and open teacher tools. Students can still create and work on projects. It's a light lock to prevent accidents, not strong security.
+- **Settings** (in the sidebar, the ⚙ button on phones, or the Settings button on the project list):
+  - **AI (Live AI).** Add the OpenAI API key and pick a model (see section 3).
+  - **Teacher PIN (optional).** Once set, it's required to open Settings, create, edit, or delete classes, delete projects, and download backups. Students can still create and work on projects. It's a light lock to prevent accidents, not strong security.
   - **Kiosk auto-return.** After 5–30 minutes with no activity, the app goes back to the project list so the next class starts fresh. It never interrupts an analysis or an open dialog.
   - **Backup & restore.** Download a `.json` backup of all classes, or of one class with the ⬇ button on that class. Restore merges it back in and keeps the newer copy of each project. Use this at the end of a term, before clearing a computer, or to move projects to another computer.
   - **Erase everything.** This can't be undone, so download a backup first.
 
 **Where data lives:** everything is saved in this computer's browser, in its built-in database (IndexedDB). That's enough room for many classes' worth of photos. It's not shared with other computers. Important for kiosks:
-- Always open the app the **same way** in the **same browser**. The double-clicked file and `http://localhost:3000` count as two separate places with separate saved projects. If you'll use Live AI, always use `http://localhost:3000`.
+- Always open the app the **same way** in the **same browser**: the same `index.html` file, in the same browser (for example, always Chrome). Moving or renaming the app folder, or opening it in a different browser, shows an empty app (your projects are still saved under the old location).
 - Don't use a private or incognito window. It erases everything when closed.
 - Clearing the browser's "site data" or "cookies" deletes the projects. Keep backups.
 
@@ -41,98 +46,104 @@ Projects saved by the first (single-project) version of the app are moved automa
 
 In **demo mode**, the results are clearly labeled **samples**. They were written from the real project-site photos and are adjusted using what you enter in *My Garden*. No AI looks at the photo in demo mode. The only thing measured from your actual photo is the **color check**, which is a simple pixel count and not AI.
 
-Your work saves automatically in your browser (localStorage). Close the tab, come back later, and your plan, checkmarks and photos are still there. It's saved per browser and per computer only.
+Your work saves automatically in the browser's database. Close the tab, come back later, and your plan, checkmarks and photos are still there. It's saved per browser and per computer only.
 
 ---
 
-## 3. Turn on real AI (live mode)
+## 3. Turn on real AI (Live AI with OpenAI)
 
-Live mode sends the photo and garden details to a vision-capable AI model (Claude). It returns a real assessment, plant list, soil plan, action plan, and chat replies.
-
-**Why a server?** An AI API key is like a password connected to billing. If you put it in `script.js`, anyone who opens the page could copy it. So the key lives in `server.js` on your computer, and the browser only talks to your server.
+Live AI sends the photo and garden details to an OpenAI vision model. It returns a real assessment, plant list, soil plan, action plan, and chat replies. It needs an internet connection, but no installs.
 
 ### Steps
 
-1. **Install Node.js** (version 18 or newer) from <https://nodejs.org>. Choose the "LTS" version.
-2. **Get an API key** from the Claude Console at <https://console.anthropic.com>. API use is billed per request, so check current pricing there. One photo analysis usually costs a few cents.
-3. In the app folder, **make a copy of `.env.example` and name it `.env`**. Open it and paste your key:
-   ```
-   ANTHROPIC_API_KEY=sk-ant-...your key...
-   ```
-   (On a Mac, files starting with a dot are hidden in Finder. Press `Cmd + Shift + .` to show them.)
-4. **Start the server.** Open Terminal (Mac) or Command Prompt (Windows), go to the folder, and run:
-   ```
-   cd "path/to/GardenGrow AI App"
-   node server.js
-   ```
-   Tip: type `cd ` and then drag the folder into the Terminal window to fill in the path.
-5. Open **<http://localhost:3000>** in your browser. Don't use the double-clicked file for this.
-6. In the sidebar under **Analysis mode**, click **Live AI**. On a phone-sized screen, tap the "Demo mode" pill at the top.
+1. **Get an OpenAI API key.** Sign in at <https://platform.openai.com>, add a payment method under **Billing**, then go to **API keys → Create new secret key**. Copy the key (it starts with `sk-`). API use is billed per request; one photo analysis usually costs a few cents.
+2. **Set a monthly budget limit** in OpenAI's Billing settings (for example, $10–20 a month). This caps what the key can ever cost.
+3. Open the app (`index.html`) and click **Settings** in the sidebar.
+4. In the **AI (Live AI)** section, paste the key into **OpenAI API key** and pick a model:
+   - **GPT-6.1 Terra** (recommended) is a good balance of accuracy and cost.
+   - **GPT-6 Luna** is the cheapest.
+   - **GPT-6.1 Sol** and **GPT-6 Astra** are more accurate but cost more.
+   - **Other model…** lets you type any OpenAI model name that accepts images.
+5. Click **Test connection**. It checks the key and whether your account can use that model.
+6. Click **Save settings**. The app switches to **Live AI** automatically.
+7. **Set a Teacher PIN** in the same window so students can't open these settings.
 
-To stop the server, press `Ctrl + C` in the Terminal.
+### Voice in Garden Chat (optional)
 
-**Optional settings in `.env`:** `AI_MODEL=` picks a different Claude model, and `PORT=` changes the port number.
+Once a key is saved, Garden Chat has two voice features that use the same OpenAI key:
+
+- **🎤 Mic button** (next to Send): tap it, ask your question out loud, then tap it again. Your words appear in the message box so you can check them before pressing **Send**. The first time, the browser asks to use the microphone; click **Allow**. Recordings stop automatically after 60 seconds.
+- **🔊 Read replies aloud** (checkbox above the message box): when it's ticked, each answer is read out loud. **Stop reading** stops it, and the **Listen** link under any answer replays it. The checkbox is remembered on this computer.
+
+Choose the voice in **Settings → Read-aloud voice**. There's a card for each of OpenAI's 13 voices: press **▶** to hear a sample (press it again to stop), then click the card to choose that voice. It saves right away. You can type your own **sample sentence** to hear how each voice reads it. **Marin** and **Cedar** are the voices OpenAI recommends for best quality. Each new sample costs a tiny amount; replaying the same sample during the same visit is free. Voice adds a small cost per use (usually well under a cent per question or answer).
+
+To change the voice models later (for example, when OpenAI retires `gpt-4o-mini-tts` in January 2027), edit `AI.speech` in PART 3 of `index.html`.
+
+### Where the key is kept (please read)
+
+The key is saved in **this computer's browser only**. It's never in the code, never uploaded to GitHub, and never included in backup files. After saving, Settings only shows its first and last few characters. To change or remove it, open Settings again.
+
+Because the app runs entirely in the browser, someone with access to this computer and some technical know-how could still find the key in the browser's storage. That's why steps 2 and 7 matter: a budget limit caps any misuse, and you can delete the key at platform.openai.com at any time and make a new one.
+
+Each computer needs the key entered once. Clearing the browser's site data removes it.
+
+**If something goes wrong,** the app shows a plain-language message: an invalid key, an account out of credit, a model the account can't use, or OpenAI being unreachable. If the school network blocks `api.openai.com`, ask IT to allow it.
 
 ---
 
-## 4. Upload the project to GitHub
+## 4. Upload your changes to GitHub
 
-`upload-to-github.sh` puts this folder on GitHub, and running it again uploads your latest changes.
+Double-click **`sync-to-github.bat`**. It saves your changes and uploads them to <https://github.com/ally0900/Garden-App>. The first time, it asks for your name and email and opens a GitHub sign-in window.
 
-1. Open **Terminal**. Type `cd ` (with a space), drag this folder into the window, and press Enter.
-2. Run: `bash upload-to-github.sh`
-3. The first time, it walks you through these steps:
-   - Your name and email, which appear on each saved version.
-   - Connecting to GitHub. If the GitHub CLI (`gh`) is installed and signed in, the script creates the repository for you. Otherwise it asks you to make an **empty** repository at <https://github.com/new> and paste its link.
-   - Signing in. Your username is your GitHub username, and the "password" is a **personal access token** from <https://github.com/settings/tokens> (tick "repo"), not your regular password.
-4. Next time, just run it again. You can add a note describing what changed: `bash upload-to-github.sh "Added okra to the crop guide"`
+You can add a note describing what changed by running it from Command Prompt: `sync-to-github.bat "Added okra to the crop guide"`
 
-The script never uploads your `.env` API key file, and it stops if one is about to be uploaded. It also skips classroom backup files (they hold student work), zip files, and extra copies of the app folder. `sample-photo.js` contains a photo of the project site, so a **private** repository is the safe default.
+It never uploads photos, videos, or zip files. (Your API key is stored in the browser, not in the folder, so it can't be uploaded.) The sample photo inside `index.html` shows the project site, so a **private** repository is the safe default.
+
+(`upload-to-github.sh` does the same job on a Mac.)
 
 ## 5. What's in each file
 
-| File | What it does |
+The whole app is **one file: `index.html`**. Open it in a text editor (Notepad works; VS Code is nicer) and press **Ctrl+F** to jump to a part:
+
+| Part (search for this) | What it holds |
 |---|---|
-| `index.html` | The structure of every screen: Home, Scan, Garden Chat, My Garden, Action Plan, Progress, Tips. Each screen is a `<section class="view">`. |
-| `style.css` | All the looks: colors, fonts, cards, layout, and mobile/tablet sizes. Brand colors are at the very top. |
-| `script.js` | Everything interactive: saving, photo upload, demo and live analysis, crop guide, action plan, chat, and progress tracking. |
-| `projects.js` | Classroom features: classes, projects, the project list, teacher PIN, kiosk auto-return, and backup/restore. |
-| `sample-photo.js` | One project-site photo stored as text, for the "Try the sample photo" button. |
-| `server.js` | Optional. Serves the app, keeps the API key secret, and forwards requests to the AI. |
-| `.env.example` | Template for your API key file. |
-| `upload-to-github.sh` | Uploads the project to GitHub (see section 4). |
-| `.gitignore` | Keeps `.env`, backups, and zip files out of GitHub. |
+| `PART 1: STYLES` | All the looks: colors, fonts, cards, layout, and mobile/tablet sizes. Brand colors are at the top of this part. |
+| `PART 2: SCREENS` | The HTML for every screen: All Projects, Home, Scan, Garden Chat, My Garden, Action Plan, Progress, Tips, Settings. Each screen is a `<section class="view">`. |
+| `PART 3: LIVE AI` | The gardening rules the AI follows and the calls to OpenAI. |
+| `PART 4: APP CODE` | Everything interactive: saving, photo upload, demo and live analysis, crop guide, action plan, chat, and progress tracking. |
+| `PART 5: CLASSROOM` | Classes, projects, the project list, and the Settings page (AI key, PIN, kiosk auto-return, backup/restore). |
+| `PART 6: SAMPLE PHOTO` | At the very bottom: one project-site photo stored as one very long line of text. Don't edit it. |
+
+Other files in the folder: `README.md` (this guide), `sync-to-github.bat` (uploads to GitHub on Windows), `upload-to-github.sh` (the Mac version), and `.gitignore` (keeps photos, backups, and zip files out of GitHub).
 
 ### How the pieces talk to each other
 
 ```
-Browser (index.html + script.js)
-   │  photo + garden details
-   ▼
-server.js  (on your computer; holds the API key)
+Browser (index.html; key saved in this browser)
    │  photo + garden details + gardening safety rules
    ▼
-Claude vision model  →  returns JSON  →  server.js  →  app displays it
+OpenAI vision model  →  returns JSON  →  app displays it
 ```
 
-In demo mode the browser never contacts a server. `script.js` builds the sample results itself.
+In demo mode nothing is sent anywhere. The app builds the sample results itself.
 
 ---
 
 ## 6. How to make common changes
 
-All of these are safe edits. Save the file and refresh the browser to see the result.
+All of these are edits to `index.html`. Save the file and refresh the browser to see the result.
 
-- **Change colors:** at the top of `style.css`, edit values like `--forest: #2E5D3A;`.
-- **Change fonts:** edit the Google Fonts `<link>` in `index.html` and the `--font-head`, `--font-body`, and `--font-script` lines in `style.css`.
-- **Add or edit a garden tip:** in `script.js`, find `const TIPS = [`. Copy one `{ ... }` block and change the text. Available icons: `soil`, `sun`, `drop`, `pumpkin`, `sprout`, `bug`, `calendar`, `bulb`.
-- **Add a crop to the crop guide:** in `script.js`, find `const CROP_GUIDE = [`. Copy one entry, change `match` (the words that identify the crop, like `/okra/i`), and edit the facts: sun hours, pH range, days to harvest, planting time, spacing, water, and pests.
-- **Change class colors:** in `projects.js`, edit `CLASS_COLORS`.
-- **Add or edit an action-plan task:** in `script.js`, find `const TASK_LIBRARY = [`. Each task is a small function that receives the garden details (`g`), so it can change priority based on answers. For example, `g.sunlight === "full" ? "medium" : "high"`.
-- **Change the demo results:** in `script.js`, edit `analyzeDemo()` (observations and concerns), `DEMO_PLANTS` (keep/remove list), and `buildSoilPlan()` (soil plan).
-- **Change the demo chat answers:** in `script.js`, edit `demoReply()`.
-- **Change what the real AI is told:** in `server.js`, edit `GARDEN_RULES` (the safety and accuracy rules) and `ANALYSIS_FORMAT` (the JSON it must return).
-- **Start fresh:** go to **Teacher tools → Erase all data**.
+- **Change colors:** in PART 1, edit values like `--forest: #2E5D3A;`.
+- **Change fonts:** edit the Google Fonts `<link>` near the top of `index.html` and the `--font-head`, `--font-body`, and `--font-script` lines in PART 1.
+- **Add or edit a garden tip:** in PART 4, find `const TIPS = [`. Copy one `{ ... }` block and change the text. Available icons: `soil`, `sun`, `drop`, `pumpkin`, `sprout`, `bug`, `calendar`, `bulb`.
+- **Add a crop to the crop guide:** in PART 4, find `const CROP_GUIDE = [`. Copy one entry, change `match` (the words that identify the crop, like `/okra/i`), and edit the facts: sun hours, pH range, days to harvest, planting time, spacing, water, and pests.
+- **Change class colors:** in PART 5, edit `CLASS_COLORS`.
+- **Add or edit an action-plan task:** in PART 4, find `const TASK_LIBRARY = [`. Each task is a small function that receives the garden details (`g`), so it can change priority based on answers. For example, `g.sunlight === "full" ? "medium" : "high"`.
+- **Change the demo results:** in PART 4, edit `analyzeDemo()` (observations and concerns), `DEMO_PLANTS` (keep/remove list), and `buildSoilPlan()` (soil plan).
+- **Change the demo chat answers:** in PART 4, edit `demoReply()`.
+- **Change what the real AI is told:** in PART 3, edit `GARDEN_RULES` (the safety and accuracy rules), `ANALYSIS_FORMAT` (the JSON it must return), and `CHAT_RULES` (how Garden Chat replies).
+- **Change the AI model list or default:** in PART 3, edit `AI.models` and `AI.defaultModel`.
+- **Start fresh:** go to **Settings → Erase all data**.
 
 ---
 
@@ -151,9 +162,9 @@ Both demo mode and the live AI follow these rules:
 
 ## 8. Known limitations (and what's next)
 
-- **Storage:** data lives in one browser on one computer, which is perfect for a kiosk. Photos are shrunk to save space, and each project keeps its 8 most recent progress photos. If students later need to use their own devices, the projects would need to move to a shared database. The app's storage code is in one place (section 2 of `script.js`), so that's the part to swap.
+- **Storage:** data lives in one browser on one computer, which is perfect for a kiosk. Photos are shrunk to save space, and each project keeps its 8 most recent progress photos. If students later need to use their own devices, the projects would need to move to a shared database. The app's storage code is in one place (section 2 of PART 4), so that's the part to swap.
 - **iPhone HEIC photos** may not open in Chrome or Firefox. Safari handles them, or you can change the iPhone camera setting to "Most Compatible" (JPG).
-- **Live mode runs only on your computer.** To put it online for others, you'd host `server.js` on a service like Render, Railway, or Fly.io and set `ANTHROPIC_API_KEY` in its settings. Never put the key in the code.
+- **The API key lives in the browser.** That keeps the app install-free, but it isn't as private as keeping the key on a server. Use a budget limit and a Teacher PIN. If the app is ever put online for students on their own devices, move the OpenAI calls in PART 3 to a small server so the key stays hidden.
 - **Demo chat** answers only common questions. Open-ended questions need Live AI.
 - AI can misidentify plants. Always confirm before removing anything.
 
