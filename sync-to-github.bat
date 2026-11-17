@@ -2,41 +2,54 @@
 REM =====================================================================
 REM  GardenGrow AI - sync-to-github.bat  (Windows)
 REM  ---------------------------------------------------------------------
-REM  Uploads this folder's app files to https://github.com/ally0900/Garden-App
-REM  Double-click it any time to upload your latest changes.
+REM  Double-click to upload this folder's latest app to GitHub:
+REM      https://github.com/ally0900/Garden-App
+REM  The public website updates 1-2 minutes later:
+REM      https://ally0900.github.io/Garden-App/
 REM
-REM  Optional: run it from Command Prompt with a message describing the change:
-REM      sync-to-github.bat "Added a new crop to the crop guide"
+REM  It also downloads any changes already on GitHub first (for example,
+REM  updates Claude uploaded), so nothing gets overwritten.
 REM
-REM  Never uploaded: your API key (ai-settings.json, .env), photos, videos, and zip files.
+REM  Optional: run it from Command Prompt with a note about the change:
+REM      sync-to-github.bat "Added okra to the crop guide"
+REM
+REM  Never uploaded: API keys (.env, ai-settings.json), photos, videos, zips.
 REM =====================================================================
 
 setlocal
 set "REPO_URL=https://github.com/ally0900/Garden-App.git"
+set "SITE_URL=https://ally0900.github.io/Garden-App/"
 set "BRANCH=main"
+title Upload GardenGrow AI to GitHub
 
 cd /d "%~dp0"
 echo.
 echo  GardenGrow AI  -^>  GitHub
 echo  Folder: %CD%
-echo  Repo:   %REPO_URL%
 echo.
 
-REM ---------- 1. Make sure Git is installed ----------
+REM ---------- 1. Is Git installed? ----------
 where git >nul 2>&1
 if errorlevel 1 (
   echo [X] Git isn't installed yet.
-  echo     Download it from https://git-scm.com/download/win
-  echo     Install with the default options, then double-click this file again.
+  echo     1. The download page will open now. Install with the default options.
+  echo     2. Then double-click this file again.
+  start "" "https://git-scm.com/download/win"
   goto :fail
 )
 
-REM ---------- 2. Protect secrets and personal files ----------
+REM ---------- 2. Is this the app folder? ----------
+if not exist "index.html" (
+  echo [X] index.html isn't in this folder.
+  echo     Put sync-to-github.bat in the same folder as the app's index.html.
+  goto :fail
+)
+
+REM ---------- 3. Keep secrets and personal files out of GitHub ----------
 if not exist ".gitignore" type nul > ".gitignore"
 call :ignore ".env"
 call :ignore ".env.*"
 call :ignore "ai-settings.json"
-call :ignore "!.env.example"
 call :ignore "node_modules/"
 call :ignore ".DS_Store"
 call :ignore "*.jpg"
@@ -46,22 +59,26 @@ call :ignore "*.heic"
 call :ignore "*.mov"
 call :ignore "*.mp4"
 call :ignore "*.zip"
+call :ignore "*.bundle"
 call :ignore "GardenGrow-AI.html"
 
-if not exist ".env.example" (
-  > ".env.example" echo # Copy this file, name the copy ".env", and paste your real key below.
-  >> ".env.example" echo # Never share .env or upload it to GitHub. It's listed in .gitignore.
-  >> ".env.example" echo ANTHROPIC_API_KEY=paste-your-key-here
+REM ---------- 4. Clear leftover Git lock files (only if Git isn't running) ----------
+tasklist /fi "imagename eq git.exe" 2>nul | find /i "git.exe" >nul
+if errorlevel 1 (
+  if exist ".git\index.lock" del /f /q ".git\index.lock" >nul 2>&1
+  if exist ".git\HEAD.lock" del /f /q ".git\HEAD.lock" >nul 2>&1
+  if exist ".git\objects\maintenance.lock" del /f /q ".git\objects\maintenance.lock" >nul 2>&1
 )
 
-REM ---------- 3. Set up the repository (first run only) ----------
+REM ---------- 5. Connect this folder to GitHub (first time only) ----------
+set "NEWREPO="
 if not exist ".git" (
-  echo Setting up Git in this folder...
+  echo Connecting this folder to GitHub...
   git init -q
   if errorlevel 1 goto :fail
   git symbolic-ref HEAD refs/heads/%BRANCH%
+  set "NEWREPO=1"
 )
-
 git remote get-url origin >nul 2>&1
 if errorlevel 1 (
   git remote add origin "%REPO_URL%"
@@ -69,10 +86,10 @@ if errorlevel 1 (
   git remote set-url origin "%REPO_URL%"
 )
 
-REM ---------- 4. Make sure Git knows who you are ----------
+REM ---------- 6. Make sure Git knows who you are ----------
 git config user.name >nul 2>&1
 if errorlevel 1 (
-  set /p "GNAME=Your name (shown on GitHub commits): "
+  set /p "GNAME=Your name (shown on GitHub): "
   call git config user.name "%%GNAME%%"
 )
 git config user.email >nul 2>&1
@@ -81,51 +98,86 @@ if errorlevel 1 (
   call git config user.email "%%GMAIL%%"
 )
 
-REM ---------- 5. Stage changes, and double-check .env is NOT included ----------
+REM ---------- 7. Get GitHub's latest history ----------
+echo Checking GitHub for the latest version...
+git fetch -q origin %BRANCH% 2>nul
+if errorlevel 1 (
+  echo [!] Couldn't reach GitHub. Check the internet connection.
+  echo     ^(If this is the first upload, a sign-in window may appear next.^)
+)
+if defined NEWREPO (
+  REM A brand-new folder: build on GitHub's history instead of starting over.
+  git rev-parse -q --verify origin/%BRANCH% >nul 2>&1
+  if not errorlevel 1 git reset -q --mixed origin/%BRANCH%
+)
+
+REM ---------- 8. Save your changes ----------
 git add -A
 git ls-files --error-unmatch .env >nul 2>&1
 if not errorlevel 1 (
   git rm -q --cached .env
-  echo [!] .env was about to be uploaded - removed it. Your key stays on this computer only.
+  echo [!] .env was about to be uploaded - left it out. Your key stays on this computer.
 )
-
 git diff --cached --quiet
 if errorlevel 1 (
   set "MSG=%~1"
   if "%~1"=="" set "MSG=Update GardenGrow AI (%DATE% %TIME:~0,5%)"
   call git commit -q -m "%%MSG%%"
   if errorlevel 1 goto :fail
-  echo [OK] Saved your changes.
+  echo [OK] Saved your changes:
+  git show --stat --format="" HEAD
 ) else (
-  echo No new changes to save.
+  echo No new changes in this folder.
 )
 git branch -M %BRANCH% >nul 2>&1
 
-REM ---------- 6. Get anything new from GitHub, then upload ----------
-git ls-remote --exit-code --heads origin %BRANCH% >nul 2>&1
+REM ---------- 9. Bring in anything new from GitHub ----------
+git rev-parse -q --verify origin/%BRANCH% >nul 2>&1
 if not errorlevel 1 (
-  echo Getting the latest from GitHub...
-  git pull -q --rebase origin %BRANCH%
+  git merge-base --is-ancestor origin/%BRANCH% HEAD >nul 2>&1
   if errorlevel 1 (
-    echo [X] Your files and GitHub's copy changed in the same place.
-    echo     Fix the files Git lists, then run:  git rebase --continue
-    echo     Or undo with:  git rebase --abort
-    goto :fail
+    echo Adding the newer changes from GitHub...
+    git rebase -q origin/%BRANCH%
+    if errorlevel 1 (
+      git rebase --abort >nul 2>&1
+      echo.
+      echo [X] The same part of a file was changed both here and on GitHub,
+      echo     so nothing was uploaded and your files were left as they were.
+      echo     Ask Claude to help combine them, or tell it which version to keep.
+      goto :fail
+    )
   )
 )
 
-echo Uploading to GitHub... (a sign-in window may open the first time)
+REM ---------- 10. Upload ----------
+git rev-list --count origin/%BRANCH%..HEAD >"%TEMP%\gg_ahead.txt" 2>nul || echo 1 >"%TEMP%\gg_ahead.txt"
+set /p AHEAD=<"%TEMP%\gg_ahead.txt"
+del "%TEMP%\gg_ahead.txt" >nul 2>&1
+if "%AHEAD%"=="0" (
+  echo.
+  echo [OK] GitHub already has the latest version. Nothing to upload.
+  goto :done
+)
+echo Uploading to GitHub... ^(a sign-in window may open the first time^)
 git push -u origin %BRANCH%
 if errorlevel 1 (
-  echo [X] Upload failed. Check that you're signed in to the ally0900 GitHub account
-  echo     and have access to the Garden-App repository.
+  echo.
+  echo [X] Upload failed. Make sure you're signed in to GitHub as ally0900.
+  echo     If a sign-in window didn't appear, try again in a minute.
   goto :fail
 )
+echo.
+echo [OK] Uploaded! The website updates in 1-2 minutes.
 
+:done
 echo.
-echo [OK] Done! See it at https://github.com/ally0900/Garden-App
+echo     GitHub:   https://github.com/ally0900/Garden-App
+echo     Website:  %SITE_URL%
 echo.
-pause
+choice /c YN /n /t 20 /d N /m "Open the website now? [Y/N] "
+if errorlevel 2 goto :end
+start "" "%SITE_URL%"
+:end
 exit /b 0
 
 :ignore
