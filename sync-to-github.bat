@@ -45,6 +45,16 @@ if not exist "index.html" (
   goto :fail
 )
 
+REM ---------- 2b. Tell Git this folder is safe to use ----------
+REM  Git refuses to work in a folder whose files were saved by a different
+REM  Windows user ("dubious ownership"). Marking this one folder as safe fixes it.
+set "SAFEDIR=%CD:\=/%"
+git config --global --get-all safe.directory 2>nul | findstr /x /i /l /c:"%SAFEDIR%" >nul
+if errorlevel 1 (
+  git config --global --add safe.directory "%SAFEDIR%"
+  echo [OK] Marked this folder as safe for Git.
+)
+
 REM ---------- 3. Keep secrets and personal files out of GitHub ----------
 if not exist ".gitignore" type nul > ".gitignore"
 call :ignore ".env"
@@ -86,16 +96,24 @@ if errorlevel 1 (
   git remote set-url origin "%REPO_URL%"
 )
 
-REM ---------- 6. Make sure Git knows who you are ----------
+REM ---------- 6. Make sure Git knows who you are (needed to save changes) ----------
+:askname
 git config user.name >nul 2>&1
 if errorlevel 1 (
-  set /p "GNAME=Your name (shown on GitHub): "
-  call git config user.name "%%GNAME%%"
+  echo.
+  echo Git needs your name and email once, to label your uploads.
+  set "GNAME="
+  set /p "GNAME=Your name (for example: Jane Smith): "
+  call :setname
+  goto :askname
 )
+:askemail
 git config user.email >nul 2>&1
 if errorlevel 1 (
+  set "GMAIL="
   set /p "GMAIL=Your email (the one on your GitHub account): "
-  call git config user.email "%%GMAIL%%"
+  call :setemail
+  goto :askemail
 )
 
 REM ---------- 7. Get GitHub's latest history ----------
@@ -162,8 +180,14 @@ echo Uploading to GitHub... ^(a sign-in window may open the first time^)
 git push -u origin %BRANCH%
 if errorlevel 1 (
   echo.
-  echo [X] Upload failed. Make sure you're signed in to GitHub as ally0900.
-  echo     If a sign-in window didn't appear, try again in a minute.
+  echo [X] Upload failed.
+  echo     If the message above says "Permission denied" or "403", this computer is
+  echo     signed in to GitHub as a different account. To fix it:
+  echo       1. Open the Start menu, type Credential Manager, and open it.
+  echo       2. Click Windows Credentials.
+  echo       3. Remove any entry named git:https://github.com
+  echo       4. Double-click this file again and sign in as ally0900.
+  echo     Otherwise, check the internet connection and try again.
   goto :fail
 )
 echo.
@@ -178,6 +202,14 @@ choice /c YN /n /t 20 /d N /m "Open the website now? [Y/N] "
 if errorlevel 2 goto :end
 start "" "%SITE_URL%"
 :end
+exit /b 0
+
+:setname
+if defined GNAME git config --global user.name "%GNAME%"
+exit /b 0
+
+:setemail
+if defined GMAIL git config --global user.email "%GMAIL%"
 exit /b 0
 
 :ignore
