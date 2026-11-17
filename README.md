@@ -30,7 +30,7 @@ Until an OpenAI key is added (section 3), the app runs in **Demo mode** with sam
 - **Students:** go to **All Projects**, find your class, and tap your team's project card. Everything (photos, action plan, chat, progress) belongs to that project only. Use the search box to find a class, project, or team member.
 - **Switching:** the chip at the top of the sidebar shows which project is open. Click **Switch** to go back to the list.
 - **Any crop:** each project lists what it wants to grow under *My Garden → Intended plants or crops* (for example, "tomatoes, basil"). Built-in guides cover pumpkins and winter squash, zucchini, cucumbers and melons, tomatoes, peppers, beans and peas, leafy greens, root crops, potatoes, corn, herbs, and sunflowers. The guides adjust sunlight needs, pH range, timing, spacing, watering, and pests. Anything else gets general vegetable advice.
-- **Settings** (in the sidebar, the ⚙ button on phones, or the Settings button on the project list):
+- **Settings** (in the sidebar, or the **Settings** button in the bottom menu on phones and tablets):
   - **AI (Live AI).** Add the OpenAI API key and pick a model (see section 3).
   - **Teacher PIN (optional).** Once set, it's required to open Settings, create, edit, or delete classes, delete projects, and download backups. Students can still create and work on projects. It's a light lock to prevent accidents, not strong security.
   - **Kiosk auto-return.** After 5–30 minutes with no activity, the app goes back to the project list so the next class starts fresh. It never interrupts an analysis or an open dialog.
@@ -52,25 +52,61 @@ Your work saves automatically in the browser's database. Close the tab, come bac
 
 ## 3. Turn on real AI (Live AI with OpenAI)
 
-Live AI sends the photo and garden details to an OpenAI vision model. It returns a real assessment, plant list, soil plan, action plan, and chat replies. It needs an internet connection, but no installs.
+Live AI sends the photo and garden details to an OpenAI vision model. It returns a real assessment, plant list, soil plan, action plan, and chat replies. There are two ways to turn it on:
 
-### Steps
+| | **A. School AI server** (recommended) | **B. A key on each device** |
+|---|---|---|
+| Best for | The public link, student devices, more than one computer | One classroom computer, quick testing |
+| Setup | Once, about 15 minutes, all in your web browser | Paste the key on every device |
+| Where the OpenAI key lives | Hidden on the server; never in anyone's browser | In that device's browser |
+| Keeps strangers out | Yes: class code + daily limits | Only a Teacher PIN on that device |
 
-1. **Get an OpenAI API key.** Sign in at <https://platform.openai.com>, add a payment method under **Billing**, then go to **API keys → Create new secret key**. Copy the key (it starts with `sk-`). API use is billed per request; one photo analysis usually costs a few cents.
-2. **Set a monthly budget limit** in OpenAI's Billing settings (for example, $10–20 a month). This caps what the key can ever cost.
-3. Open the app (`index.html`) and click **Settings** in the sidebar.
-4. In the **AI (Live AI)** section, paste the key into **OpenAI API key** and pick a model:
-   - **GPT-6.1 Terra** (recommended) is a good balance of accuracy and cost.
-   - **GPT-6 Luna** is the cheapest.
-   - **GPT-6.1 Sol** and **GPT-6 Astra** are more accurate but cost more.
-   - **Other model…** lets you type any OpenAI model name that accepts images.
-5. Click **Test connection**. It checks the key and whether your account can use that model.
-6. Click **Save settings**. The app switches to **Live AI** automatically.
-7. **Set a Teacher PIN** in the same window so students can't open these settings.
+Either way, first:
+
+1. **Get an OpenAI API key.** Sign in at <https://platform.openai.com>, add a payment method under **Billing**, then go to **API keys → Create new secret key**. Copy the key (it starts with `sk-`). One photo analysis usually costs a few cents.
+2. **Set a monthly budget limit** in OpenAI's Billing settings (for example, $10–20 a month). This is the hard cap on what the app can ever cost.
+
+### A. Set up the school AI server (Cloudflare, free)
+
+The file `school-ai-server/worker.js` is a small server. You paste it into Cloudflare's website; nothing to install.
+
+1. Go to <https://dash.cloudflare.com/sign-up> and create a free account (verify your email).
+2. In the left menu, open **Workers & Pages** (it may be under **Compute**), then click **Create** → **Create Worker** (pick "Start with Hello World" if asked).
+3. Name it `gardengrow-ai` and click **Deploy**.
+4. Click **Edit code**. Delete everything in the editor, open `school-ai-server/worker.js` (on GitHub: open the file → **Copy raw file**), paste it in, and click **Deploy**.
+5. Go back to the worker → **Settings** → **Variables and Secrets** → **Add**, and add these two, each with type **Secret**:
+   - `OPENAI_API_KEY`: your OpenAI key (`sk-...`)
+   - `CLASS_CODE`: a code you'll give students, for example `GROW2027` (not case-sensitive)
+
+   Click **Deploy** (or **Save**) after adding them.
+6. Copy the worker's address from the top of its page. It looks like `https://gardengrow-ai.your-name.workers.dev`. Open it in a browser: you should see `"app":"GardenGrow AI"` and `"keySet":true`.
+7. **Put the address into the app** so every device uses it automatically: in `index.html`, PART 3, set `serverUrl: "https://gardengrow-ai.your-name.workers.dev",` then upload to GitHub (section 4). Or ask Claude to do it.
+
+   To try it first on one device: **Settings → AI → School AI server**, paste the address and class code, click **Test server**, then **Save settings**.
+
+**Students:** the first time they click **Live AI** on a device, the app asks for the class code. They enter it once and Live AI stays on for that device.
+
+**Optional server settings** (Cloudflare → worker → Settings → Variables, type **Text**):
+- `DAILY_LIMIT`: AI requests per device per day (default 200).
+- `ALLOWED_ORIGINS`: which websites may use the server. Default: `https://ally0900.github.io,null` (`null` means the app opened as a file on a computer).
+
+**To change the class code** (for example, each new term), edit `CLASS_CODE` in Cloudflare. Everyone will be asked for the new code. **To stop Live AI everywhere** right away, delete `OPENAI_API_KEY` in Cloudflare or delete the key at platform.openai.com.
+
+**Cost:** Cloudflare's free plan allows 100,000 requests a day, far more than a class needs. OpenAI usage is billed to your OpenAI account and capped by your budget limit.
+
+### B. Or: an OpenAI key on each device
+
+1. Open the app and click **Settings** (in the sidebar, or in the bottom menu on phones and tablets).
+2. Open **Or: an OpenAI key on this device**, paste the key, and click **Test key**.
+3. Pick a model under **AI model** (**GPT-6.1 Terra** is recommended; **GPT-6 Luna** is cheapest).
+4. Click **Save settings**. The app switches to **Live AI** automatically.
+5. **Set a Teacher PIN** in the same window so students can't open Settings.
+
+The key is saved in that browser only, never uploaded or put in backups. Someone with access to that computer and some technical know-how could still find it, which is why the budget limit and PIN matter.
 
 ### Voice in Garden Chat (optional)
 
-Once a key is saved, Garden Chat has two voice features that use the same OpenAI key:
+Once Live AI is on (either way above), Garden Chat has two voice features:
 
 - **🎤 Mic button** (next to Send): tap it, ask your question out loud, then tap it again. Your words appear in the message box so you can check them before pressing **Send**. The first time, the browser asks to use the microphone; click **Allow**. Recordings stop automatically after 60 seconds.
 - **🔊 Read replies aloud** (checkbox above the message box): when it's ticked, each answer is read out loud. **Stop reading** stops it, and the **Listen** link under any answer replays it. The checkbox is remembered on this computer.
@@ -79,15 +115,9 @@ Choose the voice in **Settings → Read-aloud voice**. There's a card for each o
 
 To change the voice models later (for example, when OpenAI retires `gpt-4o-mini-tts` in January 2027), edit `AI.speech` in PART 3 of `index.html`.
 
-### Where the key is kept (please read)
+### If something goes wrong
 
-The key is saved in **this computer's browser only**. It's never in the code, never uploaded to GitHub, and never included in backup files. After saving, Settings only shows its first and last few characters. To change or remove it, open Settings again.
-
-Because the app runs entirely in the browser, someone with access to this computer and some technical know-how could still find the key in the browser's storage. That's why steps 2 and 7 matter: a budget limit caps any misuse, and you can delete the key at platform.openai.com at any time and make a new one.
-
-Each computer needs the key entered once. Clearing the browser's site data removes it.
-
-**If something goes wrong,** the app shows a plain-language message: an invalid key, an account out of credit, a model the account can't use, or OpenAI being unreachable. If the school network blocks `api.openai.com`, ask IT to allow it.
+The app shows a plain-language message: a wrong class code, a device that hit its daily limit, an invalid key, an account out of credit, or the server or OpenAI being unreachable. Teachers can check everything in **Settings → AI** with **Test server** or **Test key**. If the school network blocks `workers.dev` or `api.openai.com`, ask IT to allow it.
 
 ---
 
@@ -114,16 +144,21 @@ The whole app is **one file: `index.html`**. Open it in a text editor (Notepad w
 | `PART 5: CLASSROOM` | Classes, projects, the project list, and the Settings page (AI key, PIN, kiosk auto-return, backup/restore). |
 | `PART 6: SAMPLE PHOTO` | At the very bottom: one project-site photo stored as one very long line of text. Don't edit it. |
 
-Other files in the folder: `README.md` (this guide), `sync-to-github.bat` (uploads to GitHub on Windows), `upload-to-github.sh` (the Mac version), and `.gitignore` (keeps photos, backups, and zip files out of GitHub).
+Other files in the folder: `school-ai-server/worker.js` (the school AI server for Live AI, see section 3), `README.md` (this guide), `sync-to-github.bat` (uploads to GitHub on Windows), `upload-to-github.sh` (the Mac version), and `.gitignore` (keeps photos, backups, and zip files out of GitHub).
 
 ### How the pieces talk to each other
 
 ```
-Browser (index.html; key saved in this browser)
-   │  photo + garden details + gardening safety rules
+Browser (index.html on GitHub Pages)
+   │  photo + garden details + gardening safety rules (+ class code)
+   ▼
+School AI server (Cloudflare worker; holds the OpenAI key, checks the class code and limits)
+   │
    ▼
 OpenAI vision model  →  returns JSON  →  app displays it
 ```
+
+With option B (a key on the device), the browser talks to OpenAI directly instead.
 
 In demo mode nothing is sent anywhere. The app builds the sample results itself.
 
@@ -164,7 +199,7 @@ Both demo mode and the live AI follow these rules:
 
 - **Storage:** data lives in one browser on one computer, which is perfect for a kiosk. Photos are shrunk to save space, and each project keeps its 8 most recent progress photos. If students later need to use their own devices, the projects would need to move to a shared database. The app's storage code is in one place (section 2 of PART 4), so that's the part to swap.
 - **iPhone HEIC photos** may not open in Chrome or Firefox. Safari handles them, or you can change the iPhone camera setting to "Most Compatible" (JPG).
-- **The API key lives in the browser.** That keeps the app install-free, but it isn't as private as keeping the key on a server. Use a budget limit and a Teacher PIN. If the app is ever put online for students on their own devices, move the OpenAI calls in PART 3 to a small server so the key stays hidden.
+- **Daily limits are approximate.** The school AI server counts requests per device in memory, so the count can reset early when Cloudflare restarts the worker. Your OpenAI budget limit is the real cap.
 - **Demo chat** answers only common questions. Open-ended questions need Live AI.
 - AI can misidentify plants. Always confirm before removing anything.
 
