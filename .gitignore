@@ -12,3 +12,4 @@ node_modules/
 *.zip
 GardenGrow-AI.html
 ai-settings.json
+*.bundle

@@ -1,0 +1,8 @@
+# GardenGrow AI — your real settings. Do NOT commit or share this file.
+# On Vercel, add these same values under Project → Settings → Environment Variables.
+
+OPENAI_API_KEY=PASTE-YOUR-OPENAI-KEY-HERE
+OPENAI_MODEL=gpt-6.1-terra
+CLASS_CODE=
+DAILY_LIMIT=200
+ALLOWED_ORIGINS=

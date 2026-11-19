@@ -1381,7 +1381,7 @@ img { max-width: 100%; display: block; }
         <div class="page-head">
           <p class="eyebrow">For teachers</p>
           <h1>Settings</h1>
-          <p class="lead">Turn on Live AI, lock settings with a PIN, and back up your classes. Changes apply to this computer only.</p>
+          <p class="lead">Pick the read-aloud voice, lock settings with a PIN, and back up your classes. Changes apply to this computer only.</p>
         </div>
         <div class="settings-body" id="settingsBody"><!-- filled by the Settings code --></div>
       </section>
@@ -1419,15 +1419,11 @@ img { max-width: 100%; display: block; }
 /* =====================================================================
    GardenGrow AI — PART 3: LIVE AI  (Live AI with OpenAI)
    ---------------------------------------------------------------------
-   Live AI runs right in the browser. No server or installs needed:
-   just double-click index.html.
-
-   • The OpenAI API key is entered in Settings and saved
-     in THIS computer's browser only (localStorage). It is never put in the
-     code, never uploaded to GitHub, and never included in backup files.
-   • Because the key lives in the browser, someone with access to this
-     computer could find it. Use a key with a low monthly budget limit
-     (platform.openai.com → Billing → Limits) and set a Teacher PIN.
+   Live AI goes through the app's own AI server (api/ai.js, a Vercel
+   serverless function at /api). The OpenAI key is set as the environment
+   variable OPENAI_API_KEY in Vercel (see .env.example). It is never in
+   this file, never in the browser, and never in backup files.
+   • Set a monthly budget limit at platform.openai.com → Billing → Limits.
    • Photos are sent to OpenAI with store:false, so OpenAI doesn't keep them
      as stored responses.
 
@@ -1435,20 +1431,11 @@ img { max-width: 100%; display: block; }
    ===================================================================== */
 
 const AI = {
-  // ★ SCHOOL AI SERVER ★  Paste your Cloudflare worker's address here (see the README, section 3).
-  // With it, Live AI works for everyone who opens the app: no key on each device, and the key stays hidden.
-  // Leave it as "" to use an OpenAI key typed into Settings on each device instead.
-  serverUrl: "",
-  baseUrl: "https://api.openai.com/v1",
+  // The AI server: the Vercel function in api/ai.js. It holds the OpenAI key (OPENAI_API_KEY env variable).
+  serverUrl: "/api",
   storageKey: "gardengrow-ai-openai",
-  defaultModel: "gpt-6.1-terra",      // good balance of photo accuracy and cost
-  models: [
-    { id: "gpt-6.1-terra", label: "GPT-6.1 Terra (recommended)" },
-    { id: "gpt-6-luna",    label: "GPT-6 Luna (cheapest)" },
-    { id: "gpt-6.1-sol",   label: "GPT-6.1 Sol (more accurate, costs more)" },
-    { id: "gpt-6-astra",   label: "GPT-6 Astra (best, most expensive)" }
-  ],
-  // Voice features in Garden Chat (use the same OpenAI key).
+  defaultModel: "gpt-6.1-terra",      // the server can override this with the OPENAI_MODEL env variable
+  // Voice features in Garden Chat (go through the same AI server).
   // Note: OpenAI plans to retire gpt-4o-mini-tts in January 2027. When that happens, change ttsModel here.
   speech: {
     sttModel: "gpt-transcribe",      // speech-to-text: turns the student's voice into typed text
@@ -1468,25 +1455,18 @@ const AI = {
 
 /* ---------- Saved settings (this browser only) ---------- */
 function aiSettings() {
-  try { return { apiKey: "", model: "", ...JSON.parse(localStorage.getItem(AI.storageKey) || "{}") }; }
-  catch (e) { return { apiKey: "", model: "" }; }
+  try { return { ...JSON.parse(localStorage.getItem(AI.storageKey) || "{}") }; }
+  catch (e) { return {}; }
 }
 function saveAISettingsLocal(changes) {
   const next = { ...aiSettings(), ...changes };
   localStorage.setItem(AI.storageKey, JSON.stringify(next));
   return next;
 }
-const aiKey = () => aiSettings().apiKey;
 const aiClassCode = () => (aiSettings().classCode || "").trim();
-// The server address: one typed into Settings on this device wins, otherwise the one built into this file.
-const aiServerUrl = () => String(aiSettings().serverUrl || AI.serverUrl || "").trim().replace(/\/+$/, "");
-// How Live AI connects: "server" (school AI server) or "key" (an OpenAI key saved on this device).
-function aiConnection() {
-  const st = aiSettings();
-  if (st.useOwnKey && st.apiKey) return "key";
-  if (aiServerUrl()) return "server";
-  return st.apiKey ? "key" : "none";
-}
+const aiServerUrl = () => String(AI.serverUrl || "").trim().replace(/\/+$/, "");
+// Live AI always goes through the AI server (the OpenAI key lives there, not in the browser).
+const aiConnection = () => "server";
 // What the school AI server said the last time we checked (filled by checkAIServer).
 let aiServerStatus = { checked: false, ok: false, codeRequired: false, message: "" };
 
@@ -1501,25 +1481,20 @@ async function checkAIServer() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.app !== "GardenGrow AI") throw new Error("not a GardenGrow server");
     aiServerStatus = { checked: true, ok: !!data.keySet, codeRequired: !!data.codeRequired,
-      message: data.keySet ? "" : "The school AI server is running but has no OpenAI key yet." };
+      message: data.keySet ? "" : "The AI server is running but has no OpenAI key yet (OPENAI_API_KEY in Vercel)." };
   } catch (e) {
     aiServerStatus = { checked: true, ok: false, codeRequired: false,
-      message: "Couldn't reach the school AI server. Check the internet connection and the server address." };
+      message: "Couldn't reach the AI server. Check the internet connection." };
   }
   return aiServerStatus;
 }
 
 // Is Live AI ready to use on this device right now?
 function aiReady() {
-  const c = aiConnection();
-  if (c === "key") return true;
-  if (c === "server") return aiServerStatus.ok && (!aiServerStatus.codeRequired || !!aiClassCode());
-  return false;
+  return aiServerStatus.ok && (!aiServerStatus.codeRequired || !!aiClassCode());
 }
-const aiModel = () => aiSettings().model || AI.defaultModel;
+const aiModel = () => AI.defaultModel;
 const aiVoice = () => aiSettings().voice || AI.speech.defaultVoice;
-const aiKeyHint = k => (k ? `${k.slice(0, 3)}…${k.slice(-4)}` : "");
-const looksLikeKey = k => /^sk-[A-Za-z0-9_\-]{20,}$/.test(k || "");
 
 /* ---------- The rules the AI must follow (from the project's accuracy & safety guidelines) ---------- */
 const GARDEN_RULES = `You are GardenGrow AI, a friendly, practical gardening assistant for beginner and community gardeners.
@@ -1578,41 +1553,26 @@ function aiFriendlyError(status, data, model) {
   const code = data?.error?.code || "";
   // Messages written by the school AI server are already plain language.
   if (["bad_class_code", "daily_limit", "no_key", "origin_not_allowed", "too_large", "upstream"].includes(code)) return raw;
-  if (status === 401 && aiConnection() === "server") return "The school AI server's OpenAI key isn't working. Ask your teacher to check it.";
-  if (status === 401) return "OpenAI didn't accept the API key. Check it in Settings.";
+  if (status === 401) return "The AI server's OpenAI key isn't working. Check OPENAI_API_KEY in Vercel.";
   if (status === 429) return /quota|billing|credit/i.test(raw)
     ? "The OpenAI account is out of credit or hit its budget limit. Check Billing at platform.openai.com."
     : "OpenAI is busy or the rate limit was reached. Wait a minute and try again.";
-  if (status === 404 || (status === 400 && /model/i.test(raw))) return `The model "${model}" isn't available to this OpenAI account. Pick another in Settings.`;
+  if (status === 404 || (status === 400 && /model/i.test(raw))) return `The model "${model}" isn't available to this OpenAI account. Change OPENAI_MODEL in Vercel.`;
   if (status >= 500) return "OpenAI is having trouble right now. Please try again in a few minutes.";
   return raw || `The AI request failed (${status}).`;
 }
 
-// Low-level request to OpenAI. Returns the raw Response (errors are turned into friendly messages).
-// Goes through the school AI server when one is set up, otherwise straight to OpenAI with this device's key.
-// Passing `key` forces a direct OpenAI call with that key (used by Settings → Test).
-async function openaiRequest(path, { method = "GET", body, headers = {}, key, model = aiModel(), server } = {}) {
-  let url, auth;
-  const viaServer = key === undefined && (server || aiConnection() === "server");
-  if (viaServer) {
-    const base = (server || aiServerUrl());
-    url = base + path;
-    auth = { "X-Class-Code": aiClassCode() };
-  } else {
-    const k = key === undefined ? aiKey() : key;
-    if (!k) throw new Error("Live AI isn't set up yet. Ask your teacher to set it up in Settings.");
-    url = AI.baseUrl + path;
-    auth = { Authorization: `Bearer ${k}` };
-  }
+// Low-level request to OpenAI through the AI server. Returns the raw Response (errors are turned into friendly messages).
+async function openaiRequest(path, { method = "GET", body, headers = {}, model = aiModel(), server } = {}) {
+  const url = (server || aiServerUrl()) + path;
+  const auth = { "X-Class-Code": aiClassCode() };
   let res;
   try {
     res = await fetch(url, { method, headers: { ...auth, ...headers }, body });
   } catch (e) {
     throw new Error(navigator.onLine === false
       ? "This computer is offline. Live AI needs an internet connection."
-      : viaServer
-        ? "Couldn't reach the school AI server. Check the internet connection, or ask your teacher to check the server."
-        : "Couldn't reach OpenAI. Check the internet connection. If you're on a school network, it may be blocking api.openai.com.");
+      : "Couldn't reach the AI server. Check the internet connection and try again.");
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1622,9 +1582,9 @@ async function openaiRequest(path, { method = "GET", body, headers = {}, key, mo
 }
 
 // JSON request to OpenAI → parsed JSON reply.
-async function openaiFetch(path, { method = "GET", body, key, model = aiModel(), server } = {}) {
+async function openaiFetch(path, { method = "GET", body, model = aiModel(), server } = {}) {
   const res = await openaiRequest(path, {
-    method, key, model, server,
+    method, model, server,
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined
   });
@@ -1719,12 +1679,11 @@ let currentSpeech = null;   // { audio, url } for whatever is playing now
 
 // Reads text out loud in the chosen OpenAI voice. Resolves when it finishes (or is stopped).
 // Asks OpenAI to turn text into speech. Returns the audio (an MP3 blob).
-async function aiSpeechBlob(text, { voice = aiVoice(), key } = {}) {
+async function aiSpeechBlob(text, { voice = aiVoice() } = {}) {
   const input = speakableText(text);
   if (!input) return null;
   const res = await openaiRequest("/audio/speech", {
     method: "POST",
-    key,
     model: AI.speech.ttsModel,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: AI.speech.ttsModel, voice, input, instructions: AI.speech.speakInstructions, response_format: "mp3" })
@@ -1753,9 +1712,9 @@ function aiPlayBlob(blob, { onStart } = {}) {
 }
 
 // Reads text out loud in the chosen OpenAI voice. Resolves when it finishes (or is stopped).
-async function aiSpeak(text, { voice = aiVoice(), onStart, key } = {}) {
+async function aiSpeak(text, { voice = aiVoice(), onStart } = {}) {
   aiStopSpeaking();
-  const blob = await aiSpeechBlob(text, { voice, key });
+  const blob = await aiSpeechBlob(text, { voice });
   if (blob) await aiPlayBlob(blob, { onStart });
 }
 
@@ -1765,32 +1724,18 @@ function aiStopSpeaking() {
   audio.pause();
 }
 
-// Settings → "Test connection". Checks the key, then whether the account can use the model.
-async function aiTestConnection(key, model) {
-  if (!key) throw new Error("Paste your OpenAI API key first.");
-  if (!looksLikeKey(key)) throw new Error("That doesn't look like an OpenAI API key. Keys start with \"sk-\".");
-  const list = await openaiFetch("/models", { key, model });
-  const ids = (list.data || []).map(m => m.id);
-  if (ids.length && !ids.includes(model)) {
-    const ok = AI.models.map(m => m.id).filter(id => ids.includes(id));
-    return { ok: false, message: `The key works, but this account can't use "${model}".${ok.length ? ` Try: ${ok.join(", ")}.` : ""}` };
-  }
-  return { ok: true, message: `Connected to OpenAI. The key works with ${model}.` };
-}
-
-// Settings → "Test" for the school AI server: is it up, does it have a key, is the class code right?
+// Checks the AI server: is it up, does it have a key, is the class code right? (Used when a student enters the class code.)
 async function aiTestServer(url, code) {
   url = String(url || "").trim().replace(/\/+$/, "");
-  if (!/^https:\/\/[^\s/]+/.test(url)) throw new Error("Enter the server address. It starts with https:// and usually ends in .workers.dev");
   let health;
   try {
     const res = await fetch(url + "/health", { cache: "no-store" });
     health = await res.json();
     if (health.app !== "GardenGrow AI") throw new Error();
   } catch (e) {
-    throw new Error("Couldn't reach a GardenGrow AI server at that address. Check it and try again.");
+    throw new Error("Couldn't reach the AI server. Check the internet connection and try again.");
   }
-  if (!health.keySet) return { ok: false, message: "The server is running, but it has no OpenAI key yet. Add OPENAI_API_KEY in Cloudflare (README, section 3)." };
+  if (!health.keySet) return { ok: false, message: "The server is running, but it has no OpenAI key yet. Add OPENAI_API_KEY in Vercel's environment variables." };
   const saved = aiSettings().classCode;
   try {
     saveAISettingsLocal({ classCode: code });   // the request reads the code from settings
@@ -1798,7 +1743,7 @@ async function aiTestServer(url, code) {
   } finally {
     saveAISettingsLocal({ classCode: saved || "" });
   }
-  return { ok: true, message: health.codeRequired ? "Connected to the school AI server, and the class code works." : "Connected to the school AI server. (No class code is required. Adding CLASS_CODE in Cloudflare is recommended.)" };
+  return { ok: true, message: health.codeRequired ? "Connected to the AI server, and the class code works." : "Connected to the AI server." };
 }
 
   </script>
@@ -2296,7 +2241,7 @@ async function runAnalysis() {
 }
 
 /* --- Live AI: sends the photo + garden details to OpenAI (see PART 3: LIVE AI).
-       The API key is never in this file; it's saved in this browser on the Settings page. --- */
+       The API key is never in this file; it's an environment variable on the AI server (Vercel). --- */
 async function analyzeLive(photo, garden) {
   return normalizeAnalysis(await aiAnalyzePhoto(photo, garden), "live");
 }
@@ -2823,7 +2768,7 @@ function renderMode() {
       ? "Demo mode shows sample results. Switch to Live AI for a real analysis."
       : aiConnection() === "server" && aiServerStatus.ok && aiServerStatus.codeRequired
         ? "Demo mode shows sample results. Click Live AI and enter your class code for a real analysis."
-        : "Demo mode shows sample results. Live AI isn't set up yet (Settings → AI).";
+        : "Demo mode shows sample results. Live AI isn't available right now.";
   const pill = $("#mobileModeBtn");
   pill.textContent = live ? "Live AI" : "Demo";
   pill.classList.toggle("live", live);
@@ -2844,35 +2789,17 @@ function setMode(mode) {
 
 // Shown when someone clicks "Live AI" (or the mic) before Live AI is ready on this device.
 async function explainLiveAISetup() {
-  const conn = aiConnection();
-  if (conn === "server") {
-    if (!aiServerStatus.checked || !aiServerStatus.ok) await checkAIServer();
-    if (aiServerStatus.ok && aiServerStatus.codeRequired && !aiClassCode()) return askClassCode();
-    if (aiServerStatus.ok) { await refreshLiveAI(); return; }
-    const fd = await modal({
-      title: "Live AI isn't available right now",
-      body: `<p>${esc(aiServerStatus.message || "The school AI server isn't responding.")}</p>
-             <p class="r-hint">The app works in Demo mode in the meantime. Teachers can check the server in <strong>Settings → AI</strong>.</p>`,
-      confirmText: "Try again",
-      cancelText: "Use Demo mode"
-    });
-    if (fd) { await checkAIServer(); await refreshLiveAI(); if (!liveAvailable) toast(aiServerStatus.message || "Still not available."); else toast("Live AI is on!"); }
-    return;
-  }
+  if (!aiServerStatus.checked || !aiServerStatus.ok) await checkAIServer();
+  if (aiServerStatus.ok && aiServerStatus.codeRequired && !aiClassCode()) return askClassCode();
+  if (aiServerStatus.ok) { await refreshLiveAI(); return; }
   const fd = await modal({
-    title: "Live AI isn't set up yet",
-    body: `<p>Live AI sends your garden photo to OpenAI for a real analysis. A teacher turns it on once in <strong>Settings → AI</strong>, in one of two ways:</p>
-           <ol class="setup-steps">
-             <li><strong>School AI server</strong> (best for a shared or public link): Live AI then works on every device, and the OpenAI key stays hidden. See the README, section 3.</li>
-             <li><strong>An OpenAI key on this device</strong>: quickest for one classroom computer.</li>
-           </ol>
-           <p class="r-hint">Until then, the app stays in Demo mode with sample results.</p>`,
-    confirmText: "Go to Settings",
-    cancelText: "Not now"
+    title: "Live AI isn't available right now",
+    body: `<p>${esc(aiServerStatus.message || "The AI server isn't responding.")}</p>
+           <p class="r-hint">The app works in Demo mode in the meantime. Live AI needs the OPENAI_API_KEY environment variable set in Vercel.</p>`,
+    confirmText: "Try again",
+    cancelText: "Use Demo mode"
   });
-  if (!fd) return;
-  focusAIKeyAfterSettingsOpen = true;
-  if (location.hash === "#settings") renderSettings(); else location.hash = "#settings";
+  if (fd) { await checkAIServer(); await refreshLiveAI(); if (!liveAvailable) toast(aiServerStatus.message || "Still not available."); else toast("Live AI is on!"); }
 }
 
 // Students enter the class code here (no Teacher PIN needed). It's saved on this device.
@@ -2901,7 +2828,6 @@ async function askClassCode(message) {
     return askClassCode(err.message);
   }
 }
-let focusAIKeyAfterSettingsOpen = false;
 
 /* --- Home --- */
 function renderHome() {
@@ -3349,8 +3275,8 @@ function renderVoiceControls() {
   box.checked = !!app.readAloud && hasKey;
   box.disabled = !hasKey;
   $("#chatSpeakLabel").classList.toggle("off", !hasKey);
-  $("#chatSpeakLabel").title = hasKey ? "Read each reply out loud in an OpenAI voice" : "Needs Live AI (set up in Settings)";
-  $("#chatMic").title = hasKey ? "Speak your question" : "Voice input needs Live AI (set up in Settings)";
+  $("#chatSpeakLabel").title = hasKey ? "Read each reply out loud in an OpenAI voice" : "Needs Live AI";
+  $("#chatMic").title = hasKey ? "Speak your question" : "Voice input needs Live AI";
   $("#chatStopSpeak").hidden = !currentSpeech;
 }
 
@@ -3604,9 +3530,9 @@ function renderTips() {
 
 /* ---------- 10. START ---------- */
 
-// Live AI is available once an OpenAI key has been saved in Settings (see PART 3: LIVE AI).
+// Live AI is available once the AI server has an OpenAI key (see PART 3: LIVE AI).
 async function checkLiveAI() {
-  if (aiConnection() === "server") await checkAIServer();
+  await checkAIServer();
   liveAvailable = aiReady();
 }
 
@@ -3650,7 +3576,7 @@ document.addEventListener("DOMContentLoaded", start);
    Classroom features for a shared kiosk computer:
    • Classes (e.g. "Biology — Period 3") that each hold many projects
    • Projects (one garden each) with their own photos, plan, chat, and progress
-   • Settings page: AI key, optional PIN, auto-return to the project list, backup & restore
+   • Settings page: read-aloud voice, optional PIN, auto-return to the project list, backup & restore
    Runs after PART 4, so it can use helpers like $, esc, icon, toast.
    ===================================================================== */
 
@@ -3970,7 +3896,7 @@ async function restoreBackup(file) {
 }
 
 /* ---------- Settings page (#settings) ----------
-   AI (OpenAI key + model), Teacher PIN, kiosk auto-return, backup & restore, erase.
+   Read-aloud voice, Teacher PIN, kiosk auto-return, backup & restore, erase.
    If a Teacher PIN is set, it's asked for once each time Settings is opened. */
 let settingsUnlocked = false;
 
@@ -3988,7 +3914,6 @@ async function renderSettings() {
     settingsUnlocked = true;
   }
 
-  const ai = loadAISettings();
   let usage = "";
   try {
     const est = await navigator.storage?.estimate?.();
@@ -3997,10 +3922,6 @@ async function renderSettings() {
 
   root.innerHTML = `
     <form id="settingsForm" class="settings-form" autocomplete="off">
-      <section class="card settings-card">
-        ${aiSettingsBox(ai)}
-      </section>
-
       <section class="card settings-card" id="voiceCard">
         ${voiceSettingsBox()}
       </section>
@@ -4010,7 +3931,7 @@ async function renderSettings() {
         <div class="tools-grid">
           <label class="field"><span>Teacher PIN <small>(optional)</small></span>
             <input name="pin" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password" placeholder="${app.teacherPin ? "•••• (leave blank to keep)" : "No PIN set"}" />
-            <small class="r-hint">Needed to open Settings, create, edit, or delete classes, and delete projects. Recommended once an API key is saved. It's a light lock to prevent accidents, not strong security.</small>
+            <small class="r-hint">Needed to open Settings, create, edit, or delete classes, and delete projects. Recommended for a shared computer. It's a light lock to prevent accidents, not strong security.</small>
           </label>
           <label class="field"><span>Kiosk: return to the project list after</span>
             <select name="idle">
@@ -4040,20 +3961,12 @@ async function renderSettings() {
 
     <section class="card settings-card danger-box">
       <div class="card-head"><h2>${icon("trash")} Erase everything</h2></div>
-      <p class="r-hint">Deletes every class and project on this computer. Download a backup first. (The OpenAI key is kept; remove it above if needed.)</p>
+      <p class="r-hint">Deletes every class and project on this computer. Download a backup first.</p>
       <button type="button" class="btn btn-small btn-ghost danger" id="toolErase">${icon("trash")} Erase all data</button>
     </section>`;
 
-  setupAISettingsBox(root, ai);
   setupVoiceSettingsBox(root);
   root.querySelector("#settingsForm").addEventListener("submit", saveSettingsPage);
-  if (focusAIKeyAfterSettingsOpen) {
-    focusAIKeyAfterSettingsOpen = false;
-    const keyBox = root.querySelector("[name=aiServer]");
-    keyBox.closest(".settings-card").classList.add("attention");
-    keyBox.scrollIntoView({ block: "center" });
-    keyBox.focus();
-  }
   root.querySelector("#toolBackup").addEventListener("click", () => downloadBackup());
   root.querySelector("#restoreInput").addEventListener("change", async e => {
     const f = e.target.files[0];
@@ -4075,7 +3988,6 @@ async function saveSettingsPage(e) {
   e.preventDefault();
   const form = e.currentTarget;
   const fd = new FormData(form);
-  const ai = loadAISettings();
   const pin = (fd.get("pin") || "").trim();
   if (fd.get("clearPin")) app.teacherPin = "";
   else if (pin) app.teacherPin = pin;
@@ -4083,175 +3995,8 @@ async function saveSettingsPage(e) {
   settingsUnlocked = true;   // whoever just saved can keep using this page
   await saveApp();
   bumpIdle();
-  const aiMsg = await saveAISettings(fd, ai);   // returns a message, or "" if the AI settings didn't change
-  const msg = aiMsg || (app.teacherPin ? "Settings saved. Teacher PIN is on." : "Settings saved.");
-  toast(msg);
-  if (!/weren't saved/.test(msg)) renderSettings();   // refresh to show the saved state (key hint, PIN, etc.)
-}
-
-/* ---------- AI settings (OpenAI key + model) ----------
-   The key is saved in this computer's browser only (see PART 3: LIVE AI). It's never shown again after saving:
-   Settings only displays its first and last few characters. */
-function loadAISettings() {
-  const st = aiSettings();
-  return { hasKey: !!st.apiKey, keyHint: aiKeyHint(st.apiKey), model: aiModel(), models: AI.models,
-           server: aiServerUrl(), builtIn: AI.serverUrl, code: st.classCode || "", useOwnKey: !!st.useOwnKey, connection: aiConnection() };
-}
-
-function aiStatusPill() {
-  const c = aiConnection();
-  if (c === "server") {
-    if (!aiServerStatus.ok) return { on: false, text: "Server not reachable" };
-    if (aiServerStatus.codeRequired && !aiClassCode()) return { on: false, text: "Class code needed" };
-    return { on: true, text: "On · school AI server" };
-  }
-  if (c === "key") return { on: true, text: "On · key on this device" };
-  return { on: false, text: "Not set up" };
-}
-
-function aiSettingsBox(ai) {
-  const known = ai.models.some(m => m.id === ai.model);
-  const pill = aiStatusPill();
-  return `
-    <div class="ai-box">
-      <div class="ai-head card-head">
-        <h2>${icon("sparkle")} AI (Live AI)</h2>
-        <span class="ai-status ${pill.on ? "on" : ""}" id="aiStatus">${esc(pill.text)}</span>
-      </div>
-
-      <div class="ai-section">
-        <h3>School AI server <small class="voice-tag">Recommended</small></h3>
-        <p class="r-hint">Best for a shared or public link: Live AI works on every device without entering a key, and the OpenAI key stays hidden on the server. Set it up once on Cloudflare (free); see the README, section 3.</p>
-        <div class="tools-grid">
-          <label class="field"><span>Server address</span>
-            <input name="aiServer" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://gardengrow-ai.your-name.workers.dev" value="${esc(ai.server)}" />
-            ${ai.builtIn ? `<small class="r-hint">${ai.server === ai.builtIn ? "Built into the app, so every device uses it automatically." : "Built-in address: " + esc(ai.builtIn)}</small>` : `<small class="r-hint">To use it on every device automatically, it also needs to be added to PART 3 of index.html (<code>serverUrl</code>).</small>`}
-          </label>
-          <label class="field"><span>Class code</span>
-            <input name="aiCode" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="The CLASS_CODE you set in Cloudflare" value="${esc(ai.code)}" />
-            <small class="r-hint">Students can also enter it themselves when they click Live AI.</small>
-          </label>
-        </div>
-        <div class="tools-actions">
-          <button type="button" class="btn btn-small btn-ghost" id="aiTestServer">${icon("check")} Test server</button>
-        </div>
-      </div>
-
-      <details class="ai-section ai-own" ${ai.connection === "key" || (!ai.server && ai.hasKey) ? "open" : ""}>
-        <summary><h3>Or: an OpenAI key on this device</h3></summary>
-        <p class="r-hint">Quickest for one classroom computer. The key is saved only in this browser, never uploaded or put in backups, but someone with access to this computer could find it. Set a <strong>Teacher PIN</strong> and a <strong>monthly budget limit</strong> in your OpenAI billing settings.</p>
-        <div class="tools-grid">
-          <label class="field"><span>OpenAI API key</span>
-            <input name="aiKey" type="password" autocomplete="off" spellcheck="false" placeholder="${ai.hasKey ? `Saved (${esc(ai.keyHint)}). Paste a new key to replace it` : "sk-..."}" />
-          </label>
-          <div class="field"><span>&nbsp;</span>
-            ${ai.server ? `<label class="check-row"><input type="checkbox" name="aiUseOwnKey" ${ai.useOwnKey ? "checked" : ""} /> Use this key instead of the school AI server</label>` : ""}
-          </div>
-        </div>
-        <div class="tools-actions">
-          <button type="button" class="btn btn-small btn-ghost" id="aiTest">${icon("check")} Test key</button>
-          ${ai.hasKey ? `<button type="button" class="btn btn-small btn-ghost danger" id="aiRemove">${icon("trash")} Remove key</button>` : ""}
-        </div>
-      </details>
-
-      <div class="ai-section">
-        <div class="tools-grid">
-          <label class="field"><span>AI model</span>
-            <select name="aiModel">
-              ${ai.models.map(m => `<option value="${esc(m.id)}" ${m.id === ai.model ? "selected" : ""}>${esc(m.label)}</option>`).join("")}
-              <option value="__custom" ${known ? "" : "selected"}>Other model…</option>
-            </select>
-            <input name="aiModelCustom" class="ai-custom" placeholder="Model name, e.g. gpt-6.1-terra" value="${known ? "" : esc(ai.model)}" ${known ? "hidden" : ""} />
-            <small class="r-hint">Each photo analysis costs a few cents, billed to the OpenAI account.</small>
-          </label>
-        </div>
-      </div>
-      <p class="ai-result" id="aiResult" role="status" hidden></p>
-    </div>`;
-}
-
-function aiChosenModel(form) {
-  const sel = form.querySelector("[name=aiModel]")?.value;
-  return sel === "__custom" ? (form.querySelector("[name=aiModelCustom]")?.value || "").trim() : sel;
-}
-
-function setupAISettingsBox(d, ai) {
-  const form = d.querySelector("#settingsForm");
-  const result = d.querySelector("#aiResult");
-  const show = (msg, good) => { result.hidden = false; result.textContent = msg; result.classList.toggle("good", !!good); result.classList.toggle("bad", !good); };
-  const sel = d.querySelector("[name=aiModel]"), custom = d.querySelector("[name=aiModelCustom]");
-  sel.addEventListener("change", () => { custom.hidden = sel.value !== "__custom"; if (!custom.hidden) custom.focus(); });
-
-  d.querySelector("#aiTestServer").addEventListener("click", async e => {
-    const btn = e.currentTarget;
-    btn.disabled = true; show("Testing…", true);
-    try {
-      const r = await aiTestServer(form.querySelector("[name=aiServer]").value, form.querySelector("[name=aiCode]").value.trim());
-      show(r.message + (r.ok ? " Click “Save settings” to keep it." : ""), r.ok);
-    } catch (err) { show(err.message, false); }
-    btn.disabled = false;
-  });
-
-  d.querySelector("#aiTest").addEventListener("click", async e => {
-    const btn = e.currentTarget;
-    const typed = form.querySelector("[name=aiKey]").value.trim();
-    btn.disabled = true; show("Testing…", true);
-    try {
-      const r = await aiTestConnection(typed || aiKey(), aiChosenModel(form) || AI.defaultModel);
-      show(r.message + (r.ok && typed ? " Click “Save settings” to keep it." : ""), r.ok);
-    } catch (err) { show(err.message, false); }
-    btn.disabled = false;
-  });
-
-  d.querySelector("#aiRemove")?.addEventListener("click", async () => {
-    if (!confirm("Remove the OpenAI API key from this computer? Live AI will stop working until a new key is added.")) return;
-    saveAISettingsLocal({ apiKey: "" });
-    await refreshLiveAI();
-    toast("API key removed. The app is in Demo mode.");
-    renderSettings();
-  });
-}
-
-// Called by "Save settings". Returns a message to show, or "" if the AI settings didn't change.
-async function saveAISettings(fd, ai) {
-  const apiKey = (fd.get("aiKey") || "").trim();
-  const sel = fd.get("aiModel");
-  const chosen = (sel === "__custom" ? fd.get("aiModelCustom") || "" : sel || "").trim();
-  const serverRaw = String(fd.get("aiServer") || "").trim().replace(/\/+$/, "");
-  const code = String(fd.get("aiCode") || "").trim();
-  const useOwnKey = fd.has("aiUseOwnKey") ? !!fd.get("aiUseOwnKey") : ai.useOwnKey;
-
-  const changes = {};
-  if (apiKey) {
-    if (!looksLikeKey(apiKey)) return "The AI settings weren't saved: that doesn't look like an OpenAI API key (they start with “sk-”).";
-    changes.apiKey = apiKey;
-  }
-  if (chosen && chosen !== ai.model) {
-    if (!/^[A-Za-z0-9._:\-]+$/.test(chosen)) return "The AI settings weren't saved: that model name isn't valid.";
-    changes.model = chosen;
-  }
-  if (serverRaw !== ai.server) {
-    if (serverRaw && !/^https:\/\/[^\s/]+/.test(serverRaw)) return "The AI settings weren't saved: the server address should start with https://";
-    // Typing the built-in address (or clearing the box) just goes back to the built-in one.
-    changes.serverUrl = serverRaw === AI.serverUrl ? "" : serverRaw;
-  }
-  if (code !== ai.code) changes.classCode = code;
-  if (useOwnKey !== ai.useOwnKey) changes.useOwnKey = useOwnKey;
-  if (!Object.keys(changes).length) return "";
-
-  try {
-    saveAISettingsLocal(changes);
-  } catch (err) {
-    return "The AI settings weren't saved. This browser may be blocking storage (private window?).";
-  }
-  const wasLive = liveAvailable;
-  await refreshLiveAI();
-  if (liveAvailable && !wasLive) {
-    app.mode = "live"; await saveApp(); renderMode(); if (app.activeProjectId) renderScan();
-    return aiConnection() === "server" ? "Settings saved. Live AI is on through the school AI server!" : "Settings saved. Live AI is on!";
-  }
-  if (!liveAvailable && aiConnection() === "server") return "Settings saved, but Live AI isn't ready: " + (aiServerStatus.message || "the class code is missing.");
-  return liveAvailable ? `Settings saved. Live AI uses ${aiModel()}.` : "Settings saved.";
+  toast(app.teacherPin ? "Settings saved. Teacher PIN is on." : "Settings saved.");
+  renderSettings();   // refresh to show the saved state (PIN, etc.)
 }
 
 /* ---------- Voice picker (Settings → Read-aloud voice) ----------
@@ -4270,7 +4015,7 @@ function voiceSettingsBox() {
       <h2>${icon("volume")} Read-aloud voice</h2>
       <span class="ai-status on" id="voiceCurrent">${esc(voiceName(current))}</span>
     </div>
-    <p class="r-hint">The voice Garden Chat uses when <strong>Read replies aloud</strong> is ticked. Press ▶ to hear a sample, then click a voice to choose it. ${aiReady() ? "" : "<strong>Set up Live AI above to hear samples.</strong>"}</p>
+    <p class="r-hint">The voice Garden Chat uses when <strong>Read replies aloud</strong> is ticked. Press ▶ to hear a sample, then click a voice to choose it. ${aiReady() ? "" : "<strong>Live AI needs to be on to hear samples.</strong>"}</p>
     <label class="field voice-sentence"><span>Sample sentence <small>(optional: type your own)</small></span>
       <input name="voiceSentence" maxlength="300" placeholder="Leave blank for a short gardening sample" />
     </label>
@@ -4308,9 +4053,7 @@ function setupVoiceSettingsBox(root) {
     e.stopPropagation();
     const voice = btn.dataset.sample;
     if (playingSample === voice) { aiStopSpeaking(); return; }   // second click = stop
-    const typedKey = root.querySelector("[name=aiKey]")?.value.trim();
-    const key = typedKey || undefined;     // undefined = use the normal Live AI connection
-    if (!key && !aiReady()) return show("Set up Live AI above first.", false);
+    if (!aiReady()) return show("Live AI isn't available right now.", false);
     const sentence = card.querySelector("[name=voiceSentence]").value.trim() || defaultSampleText(voice);
     const cacheKey = voice + "|" + sentence;
     card.querySelectorAll(".voice-card").forEach(c => c.classList.remove("is-playing", "is-loading"));
@@ -4320,7 +4063,7 @@ function setupVoiceSettingsBox(root) {
       let blob = voiceSamples.get(cacheKey);
       if (!blob) {
         vc.classList.add("is-loading");
-        blob = await aiSpeechBlob(sentence, { voice, key });
+        blob = await aiSpeechBlob(sentence, { voice });
         voiceSamples.set(cacheKey, blob);
         vc.classList.remove("is-loading");
         if (playingSample !== voice) return;   // another sample was clicked while this one loaded

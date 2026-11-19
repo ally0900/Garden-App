@@ -9,7 +9,7 @@ An AI-powered gardening assistant MVP for beginner and community gardeners, buil
 - a chat assistant that discusses the photo
 - a progress tracker with before-and-after photos
 
-Built with plain **HTML, CSS, and JavaScript** (no frameworks, nothing to install). Live AI talks to OpenAI straight from the browser.
+Built with plain **HTML, CSS, and JavaScript** (no frameworks, nothing to install). Live AI goes through a small Vercel serverless function that keeps the OpenAI key secret.
 
 ---
 
@@ -21,7 +21,7 @@ Built with plain **HTML, CSS, and JavaScript** (no frameworks, nothing to instal
 2. In the class, click **New project**. Enter a team name, members (optional), and what they want to grow (optional; it can be decided later).
 3. The project opens. Click **Scan My Garden**, upload a photo (or try the sample photo), and click **Analyze My Garden**.
 
-Until an OpenAI key is added (section 3), the app runs in **Demo mode** with sample results.
+Until the app is deployed with an OpenAI key (section 3), it runs in **Demo mode** with sample results.
 
 **Tip for a classroom computer:** right-click `index.html` → **Send to → Desktop (create shortcut)** so students can find it easily.
 
@@ -31,7 +31,7 @@ Until an OpenAI key is added (section 3), the app runs in **Demo mode** with sam
 - **Switching:** the chip at the top of the sidebar shows which project is open. Click **Switch** to go back to the list.
 - **Any crop:** each project lists what it wants to grow under *My Garden → Intended plants or crops* (for example, "tomatoes, basil"). Built-in guides cover pumpkins and winter squash, zucchini, cucumbers and melons, tomatoes, peppers, beans and peas, leafy greens, root crops, potatoes, corn, herbs, and sunflowers. The guides adjust sunlight needs, pH range, timing, spacing, watering, and pests. Anything else gets general vegetable advice.
 - **Settings** (in the sidebar, or the **Settings** button in the bottom menu on phones and tablets):
-  - **AI (Live AI).** Add the OpenAI API key and pick a model (see section 3).
+  - **Read-aloud voice.** Pick the voice Garden Chat uses (see section 3).
   - **Teacher PIN (optional).** Once set, it's required to open Settings, create, edit, or delete classes, delete projects, and download backups. Students can still create and work on projects. It's a light lock to prevent accidents, not strong security.
   - **Kiosk auto-return.** After 5–30 minutes with no activity, the app goes back to the project list so the next class starts fresh. It never interrupts an analysis or an open dialog.
   - **Backup & restore.** Download a `.json` backup of all classes, or of one class with the ⬇ button on that class. Restore merges it back in and keeps the newer copy of each project. Use this at the end of a term, before clearing a computer, or to move projects to another computer.
@@ -50,63 +50,31 @@ Your work saves automatically in the browser's database. Close the tab, come bac
 
 ---
 
-## 3. Turn on real AI (Live AI with OpenAI)
+## 3. Turn on real AI (Live AI with OpenAI, hosted on Vercel)
 
-Live AI sends the photo and garden details to an OpenAI vision model. It returns a real assessment, plant list, soil plan, action plan, and chat replies. There are two ways to turn it on:
+Live AI sends the photo and garden details to an OpenAI vision model. It returns a real assessment, plant list, soil plan, action plan, and chat replies. The OpenAI key lives on the server as an **environment variable**, never in the browser or in Settings.
 
-| | **A. School AI server** (recommended) | **B. A key on each device** |
-|---|---|---|
-| Best for | The public link, student devices, more than one computer | One classroom computer, quick testing |
-| Setup | Once, about 15 minutes, all in your web browser | Paste the key on every device |
-| Where the OpenAI key lives | Hidden on the server; never in anyone's browser | In that device's browser |
-| Keeps strangers out | Yes: class code + daily limits | Only a Teacher PIN on that device |
+The app is deployed to **Vercel**. `index.html` is served as a static page, and `api/ai.js` is a small serverless function (at `/api`) that adds your OpenAI key and passes requests on to OpenAI.
 
-Either way, first:
+### Deploy to Vercel
 
-1. **Get an OpenAI API key.** Sign in at <https://platform.openai.com>, add a payment method under **Billing**, then go to **API keys → Create new secret key**. Copy the key (it starts with `sk-`). One photo analysis usually costs a few cents.
-2. **Set a monthly budget limit** in OpenAI's Billing settings (for example, $10–20 a month). This is the hard cap on what the app can ever cost.
+1. Push this folder to GitHub (section 4), or install the Vercel CLI.
+2. At <https://vercel.com/new>, import the GitHub repository. Framework preset: **Other**. No build command is needed.
+3. Under **Settings → Environment Variables**, add the variables from `.env.example`:
+   - `OPENAI_API_KEY` (**required**): your OpenAI key, starts with `sk-`.
+   - `OPENAI_MODEL` (optional): `gpt-6.1-terra` (recommended), `gpt-6-luna` (cheapest), `gpt-6.1-sol`, or `gpt-6-astra` (best).
+   - `CLASS_CODE` (optional, recommended for a public link): students enter it once when they click **Live AI**.
+   - `DAILY_LIMIT` (optional): AI requests per person per day (default 200).
+4. Click **Deploy** (after changing a variable, redeploy so it takes effect).
+5. Set a **monthly budget limit** at platform.openai.com → Billing → Limits.
 
-### A. Set up the school AI server (Cloudflare, free)
+**Running it on your computer:** copy `.env.example` to `.env`, fill in your key, and run `vercel dev`. (Double-clicking `index.html` still works, but only in Demo mode, because Live AI needs the `/api` server.)
 
-The file `school-ai-server/worker.js` is a small server. You paste it into Cloudflare's website; nothing to install.
-
-1. Go to <https://dash.cloudflare.com/sign-up> and create a free account (verify your email).
-2. In the left menu, open **Workers & Pages** (it may be under **Compute**), then click **Create** → **Create Worker** (pick "Start with Hello World" if asked).
-3. Name it `gardengrow-ai` and click **Deploy**.
-4. Click **Edit code**. Delete everything in the editor, open `school-ai-server/worker.js` (on GitHub: open the file → **Copy raw file**), paste it in, and click **Deploy**.
-5. Go back to the worker → **Settings** → **Variables and Secrets** → **Add**, and add these two, each with type **Secret**:
-   - `OPENAI_API_KEY`: your OpenAI key (`sk-...`)
-   - `CLASS_CODE`: a code you'll give students, for example `GROW2027` (not case-sensitive)
-
-   Click **Deploy** (or **Save**) after adding them.
-6. Copy the worker's address from the top of its page. It looks like `https://gardengrow-ai.your-name.workers.dev`. Open it in a browser: you should see `"app":"GardenGrow AI"` and `"keySet":true`.
-7. **Put the address into the app** so every device uses it automatically: in `index.html`, PART 3, set `serverUrl: "https://gardengrow-ai.your-name.workers.dev",` then upload to GitHub (section 4). Or ask Claude to do it.
-
-   To try it first on one device: **Settings → AI → School AI server**, paste the address and class code, click **Test server**, then **Save settings**.
-
-**Students:** the first time they click **Live AI** on a device, the app asks for the class code. They enter it once and Live AI stays on for that device.
-
-**Optional server settings** (Cloudflare → worker → Settings → Variables, type **Text**):
-- `DAILY_LIMIT`: AI requests per device per day (default 200).
-- `ALLOWED_ORIGINS`: which websites may use the server. Default: `https://ally0900.github.io,null` (`null` means the app opened as a file on a computer).
-
-**To change the class code** (for example, each new term), edit `CLASS_CODE` in Cloudflare. Everyone will be asked for the new code. **To stop Live AI everywhere** right away, delete `OPENAI_API_KEY` in Cloudflare or delete the key at platform.openai.com.
-
-**Cost:** Cloudflare's free plan allows 100,000 requests a day, far more than a class needs. OpenAI usage is billed to your OpenAI account and capped by your budget limit.
-
-### B. Or: an OpenAI key on each device
-
-1. Open the app and click **Settings** (in the sidebar, or in the bottom menu on phones and tablets).
-2. Open **Or: an OpenAI key on this device**, paste the key, and click **Test key**.
-3. Pick a model under **AI model** (**GPT-6.1 Terra** is recommended; **GPT-6 Luna** is cheapest).
-4. Click **Save settings**. The app switches to **Live AI** automatically.
-5. **Set a Teacher PIN** in the same window so students can't open Settings.
-
-The key is saved in that browser only, never uploaded or put in backups. Someone with access to that computer and some technical know-how could still find it, which is why the budget limit and PIN matter.
+`.env` is listed in `.gitignore` and `.vercelignore`, so the key is never uploaded. **To stop Live AI everywhere** right away, delete `OPENAI_API_KEY` in Vercel and redeploy, or delete the key at platform.openai.com.
 
 ### Voice in Garden Chat (optional)
 
-Once Live AI is on (either way above), Garden Chat has two voice features:
+Once Live AI is on, Garden Chat has two voice features:
 
 - **🎤 Mic button** (next to Send): tap it, ask your question out loud, then tap it again. Your words appear in the message box so you can check them before pressing **Send**. The first time, the browser asks to use the microphone; click **Allow**. Recordings stop automatically after 60 seconds.
 - **🔊 Read replies aloud** (checkbox above the message box): when it's ticked, each answer is read out loud. **Stop reading** stops it, and the **Listen** link under any answer replays it. The checkbox is remembered on this computer.
@@ -117,7 +85,7 @@ To change the voice models later (for example, when OpenAI retires `gpt-4o-mini-
 
 ### If something goes wrong
 
-The app shows a plain-language message: a wrong class code, a device that hit its daily limit, an invalid key, an account out of credit, or the server or OpenAI being unreachable. Teachers can check everything in **Settings → AI** with **Test server** or **Test key**. If the school network blocks `workers.dev` or `api.openai.com`, ask IT to allow it.
+The app shows a plain-language message: a wrong class code, a device that hit its daily limit, an invalid key, an account out of credit, or the server or OpenAI being unreachable. To check the server, open `https://<your-site>.vercel.app/api/health`: `keySet: true` means the OpenAI key is in place. Function errors show in Vercel → your project → **Logs**.
 
 ---
 
@@ -127,7 +95,7 @@ Double-click **`sync-to-github.bat`**. It saves your changes and uploads them to
 
 You can add a note describing what changed by running it from Command Prompt: `sync-to-github.bat "Added okra to the crop guide"`
 
-It never uploads photos, videos, or zip files. (Your API key is stored in the browser, not in the folder, so it can't be uploaded.) The sample photo inside `index.html` shows the project site, so a **private** repository is the safe default.
+It never uploads photos, videos, or zip files. (Your `.env` file with the API key is in `.gitignore`, so it isn't uploaded.) The sample photo inside `index.html` shows the project site, so a **private** repository is the safe default.
 
 (`upload-to-github.sh` does the same job on a Mac.)
 
@@ -141,24 +109,22 @@ The whole app is **one file: `index.html`**. Open it in a text editor (Notepad w
 | `PART 2: SCREENS` | The HTML for every screen: All Projects, Home, Scan, Garden Chat, My Garden, Action Plan, Progress, Tips, Settings. Each screen is a `<section class="view">`. |
 | `PART 3: LIVE AI` | The gardening rules the AI follows and the calls to OpenAI. |
 | `PART 4: APP CODE` | Everything interactive: saving, photo upload, demo and live analysis, crop guide, action plan, chat, and progress tracking. |
-| `PART 5: CLASSROOM` | Classes, projects, the project list, and the Settings page (AI key, PIN, kiosk auto-return, backup/restore). |
+| `PART 5: CLASSROOM` | Classes, projects, the project list, and the Settings page (voice, PIN, kiosk auto-return, backup/restore). |
 | `PART 6: SAMPLE PHOTO` | At the very bottom: one project-site photo stored as one very long line of text. Don't edit it. |
 
-Other files in the folder: `school-ai-server/worker.js` (the school AI server for Live AI, see section 3), `README.md` (this guide), `sync-to-github.bat` (uploads to GitHub on Windows), `upload-to-github.sh` (the Mac version), and `.gitignore` (keeps photos, backups, and zip files out of GitHub).
+Other files in the folder: `api/ai.js` (the AI server for Live AI, a Vercel function, see section 3), `vercel.json` (sends `/api/...` requests to it), `.env.example` (the environment variables to set), `school-ai-server/worker.js` (the old Cloudflare version, no longer used), `README.md` (this guide), `sync-to-github.bat` (uploads to GitHub on Windows), `upload-to-github.sh` (the Mac version), and `.gitignore` (keeps photos, backups, and zip files out of GitHub).
 
 ### How the pieces talk to each other
 
 ```
-Browser (index.html on GitHub Pages)
+Browser (index.html on Vercel)
    │  photo + garden details + gardening safety rules (+ class code)
    ▼
-School AI server (Cloudflare worker; holds the OpenAI key, checks the class code and limits)
+AI server (api/ai.js on Vercel; holds the OpenAI key, checks the class code and limits)
    │
    ▼
 OpenAI vision model  →  returns JSON  →  app displays it
 ```
-
-With option B (a key on the device), the browser talks to OpenAI directly instead.
 
 In demo mode nothing is sent anywhere. The app builds the sample results itself.
 
@@ -199,7 +165,7 @@ Both demo mode and the live AI follow these rules:
 
 - **Storage:** data lives in one browser on one computer, which is perfect for a kiosk. Photos are shrunk to save space, and each project keeps its 8 most recent progress photos. If students later need to use their own devices, the projects would need to move to a shared database. The app's storage code is in one place (section 2 of PART 4), so that's the part to swap.
 - **iPhone HEIC photos** may not open in Chrome or Firefox. Safari handles them, or you can change the iPhone camera setting to "Most Compatible" (JPG).
-- **Daily limits are approximate.** The school AI server counts requests per device in memory, so the count can reset early when Cloudflare restarts the worker. Your OpenAI budget limit is the real cap.
+- **Daily limits are approximate.** The school AI server counts requests per device in memory, so the count can reset early when Vercel starts a new instance. Your OpenAI budget limit is the real cap.
 - **Demo chat** answers only common questions. Open-ended questions need Live AI.
 - AI can misidentify plants. Always confirm before removing anything.
 

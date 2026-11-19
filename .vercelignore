@@ -1,0 +1,6 @@
+.env
+.env.local
+.env.*.local
+school-ai-server/
+sync-to-github.bat
+upload-to-github.sh
